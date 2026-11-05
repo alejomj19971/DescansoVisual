@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 const WORK_SECONDS = 20 * 60;
 const BREAK_SECONDS = 20;
+const REST_SECONDS = 2 * 60;
 
-type Status = "idle" | "running" | "paused" | "break";
+type Status = "idle" | "running" | "paused" | "break" | "resting";
 
 function formatTime(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60)
@@ -52,6 +53,7 @@ export default function Home() {
   const [status, setStatus] = useState<Status>("idle");
   const [secondsLeft, setSecondsLeft] = useState(WORK_SECONDS);
   const [breakSecondsLeft, setBreakSecondsLeft] = useState(BREAK_SECONDS);
+  const [restSecondsLeft, setRestSecondsLeft] = useState(REST_SECONDS);
   const [breaksTaken, setBreaksTaken] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -62,7 +64,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (status !== "running" && status !== "break") {
+    if (status !== "running" && status !== "break" && status !== "resting") {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -85,9 +87,18 @@ export default function Home() {
       } else if (status === "break") {
         setBreakSecondsLeft((prev) => {
           if (prev <= 1) {
+            setStatus("resting");
+            setRestSecondsLeft(REST_SECONDS);
+            return BREAK_SECONDS;
+          }
+          return prev - 1;
+        });
+      } else if (status === "resting") {
+        setRestSecondsLeft((prev) => {
+          if (prev <= 1) {
             setBreaksTaken((b) => b + 1);
             setStatus("running");
-            return BREAK_SECONDS;
+            return REST_SECONDS;
           }
           return prev - 1;
         });
@@ -112,12 +123,18 @@ export default function Home() {
     setStatus("idle");
     setSecondsLeft(WORK_SECONDS);
     setBreakSecondsLeft(BREAK_SECONDS);
+    setRestSecondsLeft(REST_SECONDS);
   };
 
   const handleSkipBreak = () => {
+    setStatus("resting");
+    setRestSecondsLeft(REST_SECONDS);
+  };
+
+  const handleSkipRest = () => {
     setBreaksTaken((b) => b + 1);
     setStatus("running");
-    setBreakSecondsLeft(BREAK_SECONDS);
+    setRestSecondsLeft(REST_SECONDS);
   };
 
   const progress = 1 - secondsLeft / WORK_SECONDS;
@@ -165,7 +182,8 @@ export default function Home() {
               {status === "idle" && "Listo para empezar"}
               {status === "running" && "Hasta el próximo descanso"}
               {status === "paused" && "En pausa"}
-              {status === "break" && "¡Descansando!"}
+              {status === "break" && "¡Descansando la vista!"}
+              {status === "resting" && "Descanso largo"}
             </span>
           </div>
         </div>
@@ -205,6 +223,15 @@ export default function Home() {
               👀 Descansa la vista...
             </button>
           )}
+
+          {status === "resting" && (
+            <button
+              disabled
+              className="w-full py-3.5 rounded-2xl bg-teal-500 text-white font-semibold text-lg shadow-lg shadow-teal-500/30 animate-pulse"
+            >
+              🧘 Descanso largo...
+            </button>
+          )}
         </div>
 
         {breaksTaken > 0 && (
@@ -216,9 +243,10 @@ export default function Home() {
       </div>
 
       <footer className="mt-8 text-center text-xs text-slate-400 max-w-sm">
-        Mantén esta pestaña abierta mientras trabajas. Te avisaremos cada 20
-        minutos para que mires algo a 6 metros (20 pies) de distancia durante
-        20 segundos.
+        Mantén esta pestaña abierta mientras trabajas. Cada 20 minutos te
+        avisaremos para que mires algo a 6 metros (20 pies) de distancia
+        durante 20 segundos, seguido de un descanso de 2 minutos antes de
+        continuar.
       </footer>
 
       {status === "break" && (
@@ -235,6 +263,28 @@ export default function Home() {
               className="mt-2 px-6 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-medium transition"
             >
               Saltar descanso
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === "resting" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-teal-600/95 backdrop-blur-sm text-white px-6 animate-fade-in">
+          <div className="animate-pop-in flex flex-col items-center gap-6 text-center max-w-md">
+            <span className="text-6xl">🧘</span>
+            <h2 className="text-3xl font-bold">Tómate un descanso de 2 minutos</h2>
+            <p className="text-teal-50 text-lg">
+              Levántate, estira el cuerpo o camina un poco antes de volver a tu
+              siguiente ciclo de 20 minutos.
+            </p>
+            <div className="text-6xl font-bold tabular-nums">
+              {formatTime(restSecondsLeft)}
+            </div>
+            <button
+              onClick={handleSkipRest}
+              className="mt-2 px-6 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-medium transition"
+            >
+              Saltar descanso largo
             </button>
           </div>
         </div>
